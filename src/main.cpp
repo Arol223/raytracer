@@ -3,7 +3,21 @@
 #include <iostream>
 
 namespace {
+
+bool hit_sphere(point3 center, double radius, ray ray) {
+  vec3 oc = center - ray.o();
+  double h = dot(ray.d(), oc);
+
+  double c = oc.length_squared() - radius * radius;
+
+  return h * h >= c;
+}
+
 color ray_color(ray r) {
+  if (hit_sphere(point3(0, 0, -1), 0.5, r)) {
+    return color(1, 0, 0);
+  }
+
   color white = color(1.0, 1.0, 1.0);
 
   double a = 0.5 * (r.d()[1] + 1);
