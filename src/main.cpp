@@ -1,23 +1,21 @@
+#include "hittable.hpp"
 #include "ray.hpp"
+#include "rtweekend.hpp"
 #include "vec3.hpp"
+#include <cmath>
 #include <iostream>
+#include <memory>
 
 namespace {
 
-bool hit_sphere(point3 center, double radius, ray ray) {
-  vec3 oc = center - ray.o();
-  double h = dot(ray.d(), oc);
+color ray_color(ray r, const hittable &hittables) {
+  hit_record rec;
 
-  double c = oc.length_squared() - radius * radius;
+  if (hittables.hit(r, interval(0, infinity), rec)) {
 
-  return h * h >= c;
-}
-
-color ray_color(ray r) {
-  if (hit_sphere(point3(0, 0, -1), 0.5, r)) {
-    return color(1, 0, 0);
+    return 0.5 *
+           color(rec.normal.x() + 1, rec.normal.y() + 1, rec.normal.z() + 1);
   }
-
   color white = color(1.0, 1.0, 1.0);
 
   double a = 0.5 * (r.d()[1] + 1);
@@ -49,13 +47,17 @@ int main() {
     return Q_ul + 0.5 * (du + dv) + i * du + j * dv;
   };
 
+  hittable_list world = hittable_list();
+  world.add(std::make_shared<sphere>(point3(0, -100.5, -1), 100));
+  world.add(std::make_shared<sphere>(point3(0, 0, -1), 0.5));
+
   std::cout << "P3" << " " << image_width << " " << image_height << " "
             << "255\n";
   for (int j = 0; j < image_height; j++) {
     for (int i = 0; i < image_width; i++) {
       vec3 p_ij = pixel_center(i, j);
       ray r = ray(C, p_ij - C);
-      color c = ray_color(r);
+      color c = ray_color(r, world);
       write_color(std::cout, c);
     }
   }
