@@ -1,7 +1,11 @@
 build/
 build/*
+build-release/
+build-release/*
 
 *.ppm
 
 .cache
+
+
 
