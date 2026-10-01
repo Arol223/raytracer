@@ -11,6 +11,16 @@ struct interval {
   bool surrounds(double x) const { return (min < x && x < max); }
   double min;
   double max;
+
+  double clamp(const double x) const {
+    if (x < min) {
+      return min;
+    } else if (x > max) {
+      return max;
+    } else {
+      return x;
+    }
+  }
 };
 
 inline const interval interval::empty = interval(+infinity, -infinity);

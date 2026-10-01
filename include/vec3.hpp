@@ -1,8 +1,13 @@
 #pragma once
+#include "interval.hpp"
 #include <cassert>
 #include <cmath>
 #include <ostream>
+#include <random>
 
+namespace {
+double linear_to_gamma(double x) { return x > 0 ? std::sqrt(x) : 0.0; }
+} // namespace
 class vec3 {
 public:
   double e[3];
@@ -94,10 +99,37 @@ using color = vec3;
 
 inline void write_color(std::ostream &f, const color &c) {
   const double scale = 255.999;
-  f << int(c[0] * scale) << " " << int(c[1] * scale) << " " << int(c[2] * scale)
-    << "\n";
+  interval bounds = interval(0.000, 0.999);
+  f << int(bounds.clamp(linear_to_gamma(c[0])) * scale) << " "
+    << int(bounds.clamp(linear_to_gamma(c[1])) * scale) << " "
+    << int(bounds.clamp(linear_to_gamma(c[2])) * scale) << "\n";
 }
 
 inline std::ostream &operator<<(std::ostream &out, const vec3 &v) {
   return out << v[0] << ' ' << v[1] << ' ' << v[2];
+}
+
+inline vec3 random_vec(std::mt19937 &rng, double min, double max) {
+  auto dist = std::uniform_real_distribution<double>(min, max);
+  double x = dist(rng);
+  double y = dist(rng);
+  double z = dist(rng);
+  return vec3(x, y, z);
+}
+
+inline vec3 random_vec(std::mt19937 &rng) { return random_vec(rng, 0, 1); }
+
+inline vec3 random_unit_vector(std::mt19937 &rng) {
+  while (true) {
+    vec3 vec = random_vec(rng, -1, 1);
+    double l2 = vec.length_squared();
+    if (1e-160 < l2 && l2 <= 1)
+      return vec / std::sqrt(l2);
+  }
+}
+
+inline vec3 random_on_hemisphere(std::mt19937 &rng, const vec3 &normal) {
+  vec3 vec = random_unit_vector(rng);
+
+  return dot(vec, normal) < 0 ? -vec : vec;
 }

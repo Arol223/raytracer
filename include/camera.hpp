@@ -14,8 +14,9 @@ struct camera_settings {
   double aspect_ratio = 1; // divide in caller
   double viewport_height = 2.0;
   double focal_length = 1.0;
-  int seed = 1337.0;
-  int samples_per_pixel = 10;
+  int seed = 1337;
+  int samples_per_pixel = 100;
+  int max_depth = 10;
   point3 camera_center = point3(0, 0, 0);
 };
 
@@ -26,7 +27,14 @@ public:
     image_width = cs.image_width;
     assert(cs.aspect_ratio > 0);
     image_height = std::max(int(image_width / cs.aspect_ratio), 1);
-    double seed = cs.seed;
+    seed = cs.seed;
+    assert(cs.samples_per_pixel > 0);
+    samples_per_pixel = cs.samples_per_pixel;
+
+    assert(cs.max_depth > 0);
+    max_depth = cs.max_depth;
+
+    partition = 1.0 / samples_per_pixel;
     double viewport_width =
         cs.viewport_height * (double(image_width) / image_height);
 
@@ -42,17 +50,18 @@ public:
   }
 
   void render(std::ostream &stream, const hittable &world) const {
-    std::mt19937 rng = std::mt19937(seed);
     stream << "P3 " << image_width << " " << image_height << " " << 255 << "\n";
-
+    auto rng = std::mt19937(seed);
     for (int j = 0; j < image_height; j++) {
       std::clog << "\rscanlines remaining: " << (image_height - j) << ' '
                 << std::flush;
       for (int i = 0; i < image_width; i++) {
-        vec3 p_ij = pixel_center(i, j);
-        ray r = ray(C, p_ij - C);
-        color c = ray_color(r, world);
-        write_color(stream, c);
+        color c = color(0, 0, 0);
+        for (int n = 0; n < samples_per_pixel; n++) {
+          ray r = get_ray(i, j, rng);
+          c += ray_color(r, world, max_depth, rng);
+        }
+        write_color(stream, c * partition);
       }
     }
     std::clog << "\rDone                              \n";
@@ -62,6 +71,9 @@ private:
   int image_width;
   int image_height;
   int seed;
+  int samples_per_pixel;
+  double partition;
+  int max_depth;
   vec3 du;  // horizontal pixel width
   vec3 dv;  // vertical pixel width
   point3 C; // camera center
@@ -71,18 +83,29 @@ private:
     return Q_ul + 0.5 * (du + dv) + i * du + j * dv;
   }
 
-  color ray_color(const ray &r, const hittable &hittables) const {
+  color ray_color(const ray &r, const hittable &hittables, const int depth,
+                  std::mt19937 &rng) const {
     hit_record rec;
 
-    if (hittables.hit(r, interval(0, infinity), rec)) {
+    if (hittables.hit(r, interval(0.001, infinity), rec)) {
+      if (depth <= 0)
+        return color(0, 0, 0);
 
-      return 0.5 *
-             color(rec.normal.x() + 1, rec.normal.y() + 1, rec.normal.z() + 1);
+      return 0.5 * ray_color(ray(rec.p, rec.normal + random_unit_vector(rng)),
+                             hittables, depth - 1, rng);
     }
     color white = color(1.0, 1.0, 1.0);
 
     double a = 0.5 * (r.d()[1] + 1);
 
     return (1 - a) * white + a * color(0.5, 0.7, 1.0);
+  }
+
+  ray get_ray(int i, int j, std::mt19937 &rng) const {
+    vec3 p_ij = pixel_center(i, j);
+    double u_offset = random_double(rng, -0.5, 0.5);
+    double v_offset = random_double(rng, -0.5, 0.5);
+    point3 p = p_ij + u_offset * du + v_offset * dv;
+    return ray(C, p - C);
   }
 };
