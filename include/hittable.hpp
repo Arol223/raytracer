@@ -9,12 +9,15 @@
 #include <utility>
 #include <vector>
 
+class material; // forward declaration
+
 struct hit_record {
   static constexpr double tol = 1e-6;
   point3 p;
   vec3 normal;
   double t = 0;
   bool front_face = false;
+  std::shared_ptr<material> mat;
 
   void set_face_normal(const ray &r, const vec3 &outward_normal) {
     assert(std::abs(outward_normal.length_squared() - 1) < tol);
@@ -33,8 +36,11 @@ public:
 
 class sphere : public hittable {
 public:
-  sphere(const point3 &center, double radius)
-      : center(center), radius(std::fmax(0, radius)) {}
+  sphere(const point3 &center, double radius,
+         const std::shared_ptr<material> mat)
+      : center(center), radius(std::fmax(0, radius)), mat(mat) {
+    assert(mat != nullptr);
+  }
 
   bool hit(const ray &r, const interval &ray_t,
            hit_record &rec) const override {
@@ -52,6 +58,7 @@ public:
         rec.t = t;
         rec.p = r.at(t);
         rec.set_face_normal(r, (rec.p - center) / radius);
+        rec.mat = mat;
         return true;
       }
     return false;
@@ -60,6 +67,7 @@ public:
 private:
   point3 center;
   double radius;
+  std::shared_ptr<material> mat;
 };
 
 class hittable_list : public hittable {

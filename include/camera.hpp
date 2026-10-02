@@ -1,6 +1,7 @@
 #pragma once
 #include "hittable.hpp"
 #include "interval.hpp"
+#include "material.hpp"
 #include "ray.hpp"
 #include "vec3.hpp"
 #include <algorithm>
@@ -83,16 +84,22 @@ private:
     return Q_ul + 0.5 * (du + dv) + i * du + j * dv;
   }
 
-  color ray_color(const ray &r, const hittable &hittables, const int depth,
+  color ray_color(const ray &r, const hittable &world, const int depth,
                   std::mt19937 &rng) const {
     hit_record rec;
 
-    if (hittables.hit(r, interval(0.001, infinity), rec)) {
-      if (depth <= 0)
-        return color(0, 0, 0);
+    if (depth <= 0)
+      return color(0, 0, 0);
 
-      return 0.5 * ray_color(ray(rec.p, rec.normal + random_unit_vector(rng)),
-                             hittables, depth - 1, rng);
+    if (world.hit(r, interval(0.001, infinity), rec)) {
+
+      color attenuation = color();
+      ray scattered = r;
+
+      if (rec.mat->scatter(r, rec, attenuation, scattered, rng)) {
+        return attenuation * ray_color(scattered, world, depth - 1, rng);
+      }
+      return color(0, 0, 0);
     }
     color white = color(1.0, 1.0, 1.0);
 

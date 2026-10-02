@@ -19,6 +19,11 @@ public:
   double y() const { return e[1]; }
   double z() const { return e[2]; }
 
+  bool near_zero() const {
+    return std::fabs(e[0]) < 1e-8 && std::fabs(e[1]) < 1e-8 &&
+           std::fabs(e[2]) < 1e-8;
+  }
+
   double operator[](int i) const {
     assert(0 <= i && i <= 2);
     return e[i];
@@ -132,4 +137,8 @@ inline vec3 random_on_hemisphere(std::mt19937 &rng, const vec3 &normal) {
   vec3 vec = random_unit_vector(rng);
 
   return dot(vec, normal) < 0 ? -vec : vec;
+}
+
+inline vec3 reflect(const vec3 &v, const vec3 &n) {
+  return v - 2 * dot(v, n) * n;
 }
