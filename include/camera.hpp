@@ -9,6 +9,7 @@
 #include <atomic>
 #include <cassert>
 #include <cmath>
+#include <cstddef>
 #include <iostream>
 #include <ostream>
 #include <random>
@@ -82,22 +83,40 @@ public:
 
   void render(std::ostream &stream, const hittable &world) const {
     stream << "P3 " << image_width << " " << image_height << " " << 255 << "\n";
-    auto rng = std::mt19937(seed);
     auto color_buf = std::vector<color>(image_height * image_width);
-
-    for (int j = 0; j < image_height; j++) {
-      std::clog << "\rscanlines remaining: " << (image_height - j) << ' '
-                << std::flush;
-      for (int i = 0; i < image_width; i++) {
-        color c = color(0, 0, 0);
-        for (int n = 0; n < samples_per_pixel; n++) {
-          ray r = get_ray(i, j, rng);
-          c += ray_color(r, world, max_depth, rng);
+    std::atomic<int> next{0};
+    std::atomic<int> completed{0};
+    auto worker = [&] {
+      while (true) {
+        const int j = next.fetch_add(1);
+        std::seed_seq seq{seed, j};
+        std::mt19937 rng(seq);
+        if (j >= image_height) {
+          break;
         }
-        write_color(stream, c * partition);
+        for (int i = 0; i < image_width; i++) {
+          color c = color(0, 0, 0);
+          for (int n = 0; n < samples_per_pixel; n++) {
+            ray r = get_ray(i, j, rng);
+            c += ray_color(r, world, max_depth, rng);
+          }
+          color_buf[size_t(image_width * j + i)] = c * partition;
+        }
+        std::clog << "\rscanlines remaining: "
+                  << (image_height - (completed.fetch_add(1) + 1)) << ' '
+                  << std::flush;
       }
+    };
+
+    { // scope so that threads join before write
+      std::vector<std::jthread> threads;
+      const unsigned n = std::max(1u, std::thread::hardware_concurrency());
+      for (unsigned t = 0; t < n; t++)
+        threads.emplace_back(worker);
     }
     std::clog << "\rDone                              \n";
+    for (const auto &c : color_buf)
+      write_color(stream, c);
   }
 
 private:
@@ -154,6 +173,6 @@ private:
       point3 ru = random_in_unit_disk(rng);
       ray_origin += ru.x() * u_defocus + ru.y() * v_defocus;
     }
-    return ray(ray_origin, p - ray_origin);
+    return ray(ray_origin, p - ray_origin, random_double(rng, 0, 1));
   }
 };
