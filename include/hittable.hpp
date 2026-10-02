@@ -36,15 +36,23 @@ public:
 
 class sphere : public hittable {
 public:
-  sphere(const point3 &center, double radius,
+  sphere(const point3 &center, double radius, // Stationary constructor
          const std::shared_ptr<material> mat)
       : center(center), radius(std::fmax(0, radius)), mat(mat) {
+    assert(mat != nullptr);
+    displacement = vec3(0, 0, 0);
+  }
+  sphere(const point3 &center1, const point3 &center2, double radius,
+         const std::shared_ptr<material> mat)
+      : center(center1), displacement(center2 - center1),
+        radius(std::fmax(0, radius)), mat(mat) {
     assert(mat != nullptr);
   }
 
   bool hit(const ray &r, const interval &ray_t,
            hit_record &rec) const override {
-    vec3 oc = center - r.o();
+    point3 new_center = current_center(r.time());
+    vec3 oc = new_center - r.o();
     double h = dot(r.d(), oc);
     double c = oc.length_squared() - radius * radius;
 
@@ -57,15 +65,18 @@ public:
       if (ray_t.surrounds(t)) {
         rec.t = t;
         rec.p = r.at(t);
-        rec.set_face_normal(r, (rec.p - center) / radius);
+        rec.set_face_normal(r, (rec.p - new_center) / radius);
         rec.mat = mat;
         return true;
       }
     return false;
   }
 
+  point3 current_center(double t) const { return center + displacement * t; }
+
 private:
   point3 center;
+  vec3 displacement;
   double radius;
   std::shared_ptr<material> mat;
 };
