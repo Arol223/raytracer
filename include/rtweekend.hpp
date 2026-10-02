@@ -13,3 +13,5 @@ inline double random_double(std::mt19937 &rng, double min, double max) {
   auto dist = std::uniform_real_distribution<double>(min, max);
   return dist(rng);
 }
+
+inline double deg_to_rad(double deg) { return deg * pi / 180; }

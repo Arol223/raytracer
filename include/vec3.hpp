@@ -1,5 +1,7 @@
 #pragma once
 #include "interval.hpp"
+#include "rtweekend.hpp"
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <ostream>
@@ -139,6 +141,25 @@ inline vec3 random_on_hemisphere(std::mt19937 &rng, const vec3 &normal) {
   return dot(vec, normal) < 0 ? -vec : vec;
 }
 
+inline vec3 random_in_unit_disk(std::mt19937 &rng) {
+  while (true) {
+    double x = random_double(rng, -1, 1);
+    double y = random_double(rng, -1, 1);
+    vec3 vec = vec3(x, y, 0);
+    double l2 = vec.length_squared();
+    if (l2 <= 1)
+      return vec;
+  }
+}
+
 inline vec3 reflect(const vec3 &v, const vec3 &n) {
   return v - 2 * dot(v, n) * n;
+}
+
+inline vec3 refract(const vec3 &uv, const vec3 &n, double etai_over_etat) {
+  double cos_theta = std::min(-dot(uv, n), 1.0);
+  vec3 r_orth = etai_over_etat * (uv + cos_theta * n);
+  assert(r_orth.length_squared() <= 1.0);
+  vec3 r_par = -std::sqrt(1 - r_orth.length_squared()) * n;
+  return r_orth + r_par;
 }

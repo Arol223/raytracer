@@ -3,22 +3,29 @@
 #include "interval.hpp"
 #include "material.hpp"
 #include "ray.hpp"
+#include "rtweekend.hpp"
 #include "vec3.hpp"
 #include <algorithm>
+#include <atomic>
 #include <cassert>
+#include <cmath>
 #include <iostream>
 #include <ostream>
 #include <random>
+#include <thread>
 
 struct camera_settings {
   int image_width = 400;
   double aspect_ratio = 1; // divide in caller
-  double viewport_height = 2.0;
-  double focal_length = 1.0;
+  double vfov = 90;        // vertical field of view [deg]
+  point3 look_from = point3(0, 0, 0);
+  point3 look_at = point3(0, 0, -1);
+  vec3 v_up = vec3(0, 1, 0);
   int seed = 1337;
   int samples_per_pixel = 100;
   int max_depth = 10;
-  point3 camera_center = point3(0, 0, 0);
+  double defocus_angle = 0;
+  double focus_dist = 10;
 };
 
 class camera {
@@ -36,23 +43,48 @@ public:
     max_depth = cs.max_depth;
 
     partition = 1.0 / samples_per_pixel;
-    double viewport_width =
-        cs.viewport_height * (double(image_width) / image_height);
 
-    vec3 u = vec3(viewport_width, 0, 0);
-    vec3 v = vec3(0, -cs.viewport_height, 0);
+    assert(interval(0, 180).surrounds(cs.vfov));
 
-    du = u / image_width;
-    dv = v / image_height;
+    // focus
+    assert(cs.defocus_angle >= 0 && cs.defocus_angle < 120);
+    assert(cs.focus_dist > 0);
+    defocus_angle = cs.defocus_angle;
+    // Orthonormal basis in camera coordinates
+    assert((cs.look_from - cs.look_at).length() > 0 + 1e-6);
+    vec3 w = cs.look_from - cs.look_at;
+    double focal_length = w.length();
+    w /= focal_length;
+    vec3 u = cross(cs.v_up, w);
+    double u_len = u.length();
+    assert(u_len > 0 + 1e-6);
+    u /= u_len;
+    vec3 v = cross(w, u);
 
-    C = cs.camera_center;
+    double vp_height = 2 * std::tan(deg_to_rad(cs.vfov) / 2) * cs.focus_dist;
+    double viewport_width = vp_height * (double(image_width) / image_height);
 
-    Q_ul = C - point3(0, 0, cs.focal_length) - u / 2 - v / 2;
+    vec3 vu = viewport_width * u; // viewport horizontal
+    vec3 vv = -vp_height * v;     // viewport vertical
+
+    // defocus disk
+    double rad = cs.focus_dist * std::tan(deg_to_rad(defocus_angle) / 2);
+    u_defocus = u * rad;
+    v_defocus = v * rad;
+
+    du = vu / image_width;
+    dv = vv / image_height;
+
+    C = cs.look_from;
+
+    Q_ul = C - cs.focus_dist * w - vu / 2 - vv / 2;
   }
 
   void render(std::ostream &stream, const hittable &world) const {
     stream << "P3 " << image_width << " " << image_height << " " << 255 << "\n";
     auto rng = std::mt19937(seed);
+    auto color_buf = std::vector<color>(image_height * image_width);
+
     for (int j = 0; j < image_height; j++) {
       std::clog << "\rscanlines remaining: " << (image_height - j) << ' '
                 << std::flush;
@@ -75,8 +107,11 @@ private:
   int samples_per_pixel;
   double partition;
   int max_depth;
-  vec3 du;  // horizontal pixel width
-  vec3 dv;  // vertical pixel width
+  double defocus_angle;
+  vec3 du; // horizontal pixel width
+  vec3 dv; // vertical pixel width
+  vec3 u_defocus;
+  vec3 v_defocus;
   point3 C; // camera center
   point3 Q_ul;
 
@@ -113,6 +148,12 @@ private:
     double u_offset = random_double(rng, -0.5, 0.5);
     double v_offset = random_double(rng, -0.5, 0.5);
     point3 p = p_ij + u_offset * du + v_offset * dv;
-    return ray(C, p - C);
+
+    point3 ray_origin = C;
+    if (defocus_angle > 0) {
+      point3 ru = random_in_unit_disk(rng);
+      ray_origin += ru.x() * u_defocus + ru.y() * v_defocus;
+    }
+    return ray(ray_origin, p - ray_origin);
   }
 };
