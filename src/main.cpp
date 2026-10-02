@@ -1,6 +1,7 @@
 #include "camera.hpp"
 #include "hittable.hpp"
 #include "material.hpp"
+#include "rtweekend.hpp"
 #include "vec3.hpp"
 #include <cmath>
 #include <iostream>
@@ -27,10 +28,12 @@ hittable_list scene_generation(std::uint32_t seed = 42) {
         continue;
 
       std::shared_ptr<material> sphere_material;
+      bool diffuse = false;
       if (choose_mat < 0.8) { // diffuse
         const color c1 = random_vec(rng, 0, 1);
         const color c2 = random_vec(rng, 0, 1);
         sphere_material = std::make_shared<lambertian>(c1 * c2);
+        diffuse = true;
       } else if (choose_mat < 0.95) { // metal
         const color albedo = random_vec(rng, 0.5, 1);
         const double fuzz = random_double(rng, 0, 0.5);
@@ -38,7 +41,13 @@ hittable_list scene_generation(std::uint32_t seed = 42) {
       } else { // glass
         sphere_material = std::make_shared<dielectric>(1.5);
       }
-      world.add(std::make_shared<sphere>(center, 0.2, sphere_material));
+      if (diffuse) {
+        world.add(std::make_shared<sphere>(
+            center, center + point3(0, random_double(rng, 0, 0.1), 0), 0.2,
+            sphere_material));
+      } else {
+        world.add(std::make_shared<sphere>(center, 0.2, sphere_material));
+      }
     }
   }
 
@@ -59,13 +68,13 @@ int main() {
   // aspect ratio 16:9
   camera_settings cs = camera_settings();
   cs.aspect_ratio = 16.0 / 9.0;
-  cs.image_width = 1200;
+  cs.image_width = 400;
   cs.look_from = point3(13, 2, 3);
   cs.look_at = point3(0, 0, 0);
   cs.v_up = vec3(0, 1, 0);
   cs.vfov = 20;
-  cs.max_depth = 100;
-  cs.samples_per_pixel = 500;
+  cs.max_depth = 50;
+  cs.samples_per_pixel = 100;
   cs.focus_dist = 10;
   cs.defocus_angle = 0.6;
   camera c = camera(cs);

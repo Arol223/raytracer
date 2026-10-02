@@ -21,12 +21,12 @@ class lambertian : public material {
 public:
   explicit lambertian(color albedo) : alb(albedo) {}
 
-  bool scatter(const ray & /*r_in*/, const hit_record &rec, color &attenuation,
+  bool scatter(const ray &r_in, const hit_record &rec, color &attenuation,
                ray &scattered, std::mt19937 &rng) const override {
     vec3 scatter_dir = rec.normal + random_unit_vector(rng);
     if (scatter_dir.near_zero())
       scatter_dir = rec.normal;
-    scattered = ray(rec.p, scatter_dir);
+    scattered = ray(rec.p, scatter_dir, r_in.time());
     attenuation = alb;
     return true;
   }
@@ -44,7 +44,7 @@ public:
 
     vec3 scatter_dir =
         reflect(r_in.d(), rec.normal) + fuzz * random_unit_vector(rng);
-    scattered = ray(rec.p, scatter_dir);
+    scattered = ray(rec.p, scatter_dir, r_in.time());
     attenuation = albedo;
     return dot(scatter_dir, rec.normal) > 0;
   }
@@ -63,7 +63,7 @@ public:
   bool scatter(const ray &r_in, const hit_record &rec, color &attenuation,
                ray &scattered, std::mt19937 &rng) const override {
     double eff_ratio = rec.front_face ? 1 / refraction_index : refraction_index;
-    double cos_theta = -std::min(dot(r_in.d(), rec.normal), 1.0);
+    double cos_theta = std::min(-dot(r_in.d(), rec.normal), 1.0);
     double sin_theta = std::sqrt(1 - cos_theta * cos_theta);
 
     bool cannot_refract =
@@ -75,7 +75,7 @@ public:
                            : refract(r_in.d(), rec.normal, eff_ratio);
 
     attenuation = color(1, 1, 1);
-    scattered = ray(rec.p, scatter_dir);
+    scattered = ray(rec.p, scatter_dir, r_in.time());
     return true;
   }
 
