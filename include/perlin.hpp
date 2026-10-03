@@ -27,7 +27,7 @@ public:
     point3 integers;
     for (int i = 0; i < 3; i++) {
       integers[i] = static_cast<int>(std::floor(p[i]));
-      fractional[i] = p[i] - integers[i];
+      fractional[i] = hermite3(p[i] - integers[i]);
     }
     std::array<double, 8> c_abc =
         corner_values(integers[0], integers[1], integers[2]);
@@ -72,4 +72,6 @@ private:
     }
     return sum;
   }
+
+  static double hermite3(double x) { return x * x * (3 - 2 * x); }
 };
