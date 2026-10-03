@@ -1,7 +1,7 @@
 #include "scenes.hpp"
 
 int main() {
-  switch (4) {
+  switch (1) {
   case 1:
     bouncing_spheres();
     break;

@@ -73,13 +73,18 @@ private:
 class noise_texture : public texture {
 public:
   noise_texture(double scale, std::mt19937 &rng)
-      : noise_scale(scale), generator(rng) {}
+      : noise_scale(scale), generator(rng), c(1, 1, 1) {}
+  noise_texture(double scale, std::mt19937 &rng, color tint)
+      : noise_scale(scale), generator(rng), c(tint) {}
 
   color value(double, double, const point3 &p) const override {
-    return color(1, 1, 1) * generator.noise(p * noise_scale);
+    return c * 0.5 *
+           (1 +
+            std::sin(noise_scale * p.z() + 10 * turbulence(generator, p, 7)));
   }
 
 private:
   double noise_scale;
   perlin generator;
+  color c;
 };

@@ -22,7 +22,7 @@ struct hit_record {
   double t = 0;
   bool front_face = false;
   std::shared_ptr<material> mat;
-  double u, v; // surface coordinates
+  double u, v = 0; // surface coordinates
 
   void set_face_normal(const ray &r, const vec3 &outward_normal) {
     assert(std::abs(outward_normal.length_squared() - 1) < tol);
@@ -167,7 +167,7 @@ public:
                   return a->bounding_box().axis_interval(axis).min <
                          b->bounding_box().axis_interval(axis).min;
                 });
-      size_t mid = start + (end - start) / 2;
+      std::size_t mid = start + (end - start) / 2;
       left = std::make_shared<bvh_node>(objects, start, mid);
       right = std::make_shared<bvh_node>(objects, mid, end);
     }
