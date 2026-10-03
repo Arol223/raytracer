@@ -124,3 +124,31 @@ void earth() {
   camera cam(cs);
   cam.render(std::cout, hittable_list(globe));
 }
+
+void perlin_spheres() {
+  hittable_list world;
+
+  std::mt19937 rng(42);
+  auto pertext = std::make_shared<noise_texture>(4, rng);
+
+  world.add(std::make_shared<sphere>(point3(0, -1000, 0), 1000,
+                                     std::make_shared<lambertian>(pertext)));
+  world.add(std::make_shared<sphere>(point3(0, 2, 0), 2,
+                                     std::make_shared<lambertian>(pertext)));
+
+  camera_settings cs;
+
+  cs.aspect_ratio = 16.0 / 9.0;
+  cs.image_width = 400;
+  cs.samples_per_pixel = 100;
+  cs.max_depth = 50;
+
+  cs.vfov = 20;
+  cs.look_from = point3(13, 2, 3);
+  cs.look_at = point3(0, 0, 0);
+  cs.v_up = vec3(0, 1, 0);
+
+  cs.defocus_angle = 0;
+  camera cam(cs);
+  cam.render(std::cout, world);
+}

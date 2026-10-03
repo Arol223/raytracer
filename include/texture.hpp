@@ -1,9 +1,11 @@
 #pragma once
+#include "perlin.hpp"
 #include "rtw_stb_image.hpp"
 #include "vec3.hpp"
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <random>
 
 class texture {
 public:
@@ -66,4 +68,18 @@ public:
 
 private:
   rtw_image image;
+};
+
+class noise_texture : public texture {
+public:
+  noise_texture(double scale, std::mt19937 &rng)
+      : noise_scale(scale), generator(rng) {}
+
+  color value(double, double, const point3 &p) const override {
+    return color(1, 1, 1) * generator.noise(p * noise_scale);
+  }
+
+private:
+  double noise_scale;
+  perlin generator;
 };

@@ -1,7 +1,7 @@
 #include "scenes.hpp"
 
 int main() {
-  switch (3) {
+  switch (4) {
   case 1:
     bouncing_spheres();
     break;
@@ -10,6 +10,10 @@ int main() {
     break;
   case 3:
     earth();
+    break;
+
+  case 4:
+    perlin_spheres();
     break;
   }
   return 0;
