@@ -3,10 +3,12 @@
 #include "interval.hpp"
 #include "ray.hpp"
 #include "rtweekend.hpp"
+#include "texture.hpp"
 #include "vec3.hpp"
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
+#include <memory>
 #include <random>
 
 class material {
@@ -19,7 +21,8 @@ public:
 
 class lambertian : public material {
 public:
-  explicit lambertian(color albedo) : alb(albedo) {}
+  lambertian(std::shared_ptr<texture> tex) : tex(std::move(tex)) {}
+  lambertian(color tex) : tex(std::make_shared<solid_color>(tex)) {}
 
   bool scatter(const ray &r_in, const hit_record &rec, color &attenuation,
                ray &scattered, std::mt19937 &rng) const override {
@@ -27,12 +30,12 @@ public:
     if (scatter_dir.near_zero())
       scatter_dir = rec.normal;
     scattered = ray(rec.p, scatter_dir, r_in.time());
-    attenuation = alb;
+    attenuation = tex->value(rec.u, rec.v, rec.p);
     return true;
   }
 
 private:
-  color alb;
+  std::shared_ptr<texture> tex;
 };
 
 class metal : public material {

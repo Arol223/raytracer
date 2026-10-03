@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # for clangd
 
-add_executable(raytracer src/main.cpp)
+add_executable(raytracer src/main.cpp src/scenes.cpp src/stb_image.cpp)
 target_compile_options(raytracer PRIVATE -Wall -Wextra -Wpedantic)
 add_library(rt INTERFACE)
 find_package(Threads REQUIRED)
