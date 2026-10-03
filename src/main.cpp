@@ -68,17 +68,18 @@ int main() {
   // aspect ratio 16:9
   camera_settings cs = camera_settings();
   cs.aspect_ratio = 16.0 / 9.0;
-  cs.image_width = 400;
+  cs.image_width = 1200;
   cs.look_from = point3(13, 2, 3);
   cs.look_at = point3(0, 0, 0);
   cs.v_up = vec3(0, 1, 0);
   cs.vfov = 20;
-  cs.max_depth = 50;
-  cs.samples_per_pixel = 100;
+  cs.max_depth = 100;
+  cs.samples_per_pixel = 500;
   cs.focus_dist = 10;
   cs.defocus_angle = 0.6;
   camera c = camera(cs);
   hittable_list world = scene_generation();
+  bvh_node BVH = bvh_node(world.get_hit_list());
 
   /*
   hittable_list world = hittable_list();
@@ -96,7 +97,7 @@ int main() {
   world.add(std::make_shared<sphere>(point3(-1, 0, -1), 0.4, air_bubble));
   world.add(std::make_shared<sphere>(point3(1, 0, -1), 0.5, metal2));
  */
-  c.render(std::cout, world);
+  c.render(std::cout, BVH);
 
   /*
     std::cout << "P3" << " " << "256" << " " << "256" << " " << "255\n";
