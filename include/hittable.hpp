@@ -3,6 +3,7 @@
 #include "interval.hpp"
 #include "ray.hpp"
 #include "rtweekend.hpp"
+#include "texture.hpp"
 #include "vec3.hpp"
 #include <algorithm>
 #include <array>

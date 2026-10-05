@@ -1,7 +1,7 @@
 #include "scenes.hpp"
 
 int main() {
-  switch (9) {
+  switch (10) {
   case 1:
     bouncing_spheres();
     break;
@@ -28,6 +28,9 @@ int main() {
     break;
   case 9:
     standard_cornell();
+    break;
+  case 10:
+    cornell_smoke();
     break;
   }
 

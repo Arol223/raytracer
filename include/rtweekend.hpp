@@ -14,4 +14,9 @@ inline double random_double(std::mt19937 &rng, double min, double max) {
   return dist(rng);
 }
 
+inline std::mt19937 &thread_rng() {
+  thread_local std::mt19937 rng(std::random_device{}());
+  return rng;
+}
+
 inline double deg_to_rad(double deg) { return deg * pi / 180; }

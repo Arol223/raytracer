@@ -16,3 +16,5 @@ void simple_light();
 void cornell_box();
 
 void standard_cornell();
+
+void cornell_smoke();

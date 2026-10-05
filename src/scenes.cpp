@@ -1,5 +1,6 @@
 #include "scenes.hpp"
 #include "camera.hpp"
+#include "constant_medium.hpp"
 #include "hittable.hpp"
 #include "vec3.hpp"
 #include <cstdint>
@@ -330,6 +331,51 @@ void standard_cornell() {
 
   world.add(trans1);
   world.add(trans2);
+
+  camera_settings settings;
+  settings.image_width = 600;
+  settings.aspect_ratio = 1.0;
+  settings.vfov = 40;
+  settings.look_from = point3(278, 278, -800);
+  settings.look_at = point3(278, 278, 0);
+  settings.v_up = vec3(0, 1, 0);
+  settings.background_color = color(0, 0, 0);
+  settings.samples_per_pixel = 1000;
+  settings.max_depth = 50;
+
+  camera cam(settings);
+  cam.render(std::cout, world);
+}
+
+void cornell_smoke() {
+  hittable_list world;
+
+  auto red = std::make_shared<lambertian>(color(.65, .05, .05));
+  auto white = std::make_shared<lambertian>(color(.73, .73, .73));
+  auto green = std::make_shared<lambertian>(color(.12, .45, .15));
+  auto light = std::make_shared<diffuse_light>(color(15, 15, 15));
+
+  auto wall = [&world](const point3 &q, const vec3 &u, const vec3 &v,
+                       std::shared_ptr<material> mat) {
+    world.add(std::make_shared<planar_shape>(q, u, v, mat));
+  };
+
+  wall(point3(555, 0, 0), vec3(0, 555, 0), vec3(0, 0, 555), green);
+  wall(point3(0, 0, 0), vec3(0, 555, 0), vec3(0, 0, 555), red);
+  wall(point3(343, 554, 332), vec3(-130, 0, 0), vec3(0, 0, -105), light);
+  wall(point3(0, 0, 0), vec3(555, 0, 0), vec3(0, 0, 555), white);
+  wall(point3(555, 555, 555), vec3(-555, 0, 0), vec3(0, 0, -555), white);
+  wall(point3(0, 0, 555), vec3(555, 0, 0), vec3(0, 555, 0), white);
+
+  auto box1 = box(point3(0, 0, 0), point3(165, 330, 165), white);
+  auto box2 = box(point3(0, 0, 0), point3(165, 165, 165), white);
+  auto rot1 = std::make_shared<rotate>(box1, 15);
+  auto trans1 = std::make_shared<translate>(rot1, point3(265, 0, 295));
+  auto rot2 = std::make_shared<rotate>(box2, -18);
+  auto trans2 = std::make_shared<translate>(rot2, vec3(130, 0, 65));
+
+  world.add(std::make_shared<constant_medium>(trans1, 0.01, color(0, 0, 0)));
+  world.add(std::make_shared<constant_medium>(trans2, 0.01, color(1, 1, 1)));
 
   camera_settings settings;
   settings.image_width = 600;
