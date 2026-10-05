@@ -36,3 +36,7 @@ struct interval {
 
 inline const interval interval::empty = interval(+infinity, -infinity);
 inline const interval interval::universe = interval(-infinity, +infinity);
+inline interval operator+(const interval &i, double shift) {
+  return interval(i.min + shift, i.max + shift);
+}
+inline interval operator+(double shift, const interval &i) { return i + shift; }

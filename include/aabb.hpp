@@ -10,11 +10,14 @@
 class aabb {
 public:
   aabb() = default;
-  aabb(interval a, interval b, interval c) : intervals{a, b, c} {}
+  aabb(interval a, interval b, interval c) : intervals{a, b, c} {
+    pad_to_minimums();
+  }
   aabb(const point3 &a, const point3 &b) {
     for (int n = 0; n < 3; n++) {
       intervals[n] = interval(std::min(a[n], b[n]), std::max(a[n], b[n]));
     }
+    pad_to_minimums();
   }
   aabb(const aabb &a, const aabb &b) {
     for (int n = 0; n < 3; n++) {
@@ -53,14 +56,48 @@ public:
     double biggest_so_far = 0;
     for (int n = 0; n < 3; n++) {
       double s = intervals[n].size();
-      if (s > axis) {
-        axis = s;
-        biggest_so_far = n;
+      if (s > biggest_so_far) {
+        axis = n;
+        biggest_so_far = s;
       }
     }
-    return biggest_so_far;
+    return axis;
   }
 
 private:
   std::array<interval, 3> intervals;
+  void pad_to_minimums() {
+    for (interval &i : intervals) {
+      if (i.size() < 0.0001) {
+        i = i.expand(0.0001);
+      }
+    }
+  }
 };
+
+inline aabb operator+(const aabb &box, const vec3 &shift) {
+  return aabb(box.axis_interval(0) + shift.x(),
+              box.axis_interval(1) + shift.y(),
+              box.axis_interval(2) + shift.z());
+}
+
+inline aabb operator+(const vec3 &shift, const aabb &box) {
+  return box + shift;
+}
+
+inline std::array<vec3, 8> get_corners(const aabb &box) {
+  std::array<interval, 3> intervals;
+  for (int i = 0; i < 3; i++) {
+    intervals[i] = box.axis_interval(i);
+  }
+  std::array<vec3, 8> corners;
+  corners[0] = vec3(intervals[0].min, intervals[1].min, intervals[2].min);
+  corners[1] = vec3(intervals[0].min, intervals[1].min, intervals[2].max);
+  corners[2] = vec3(intervals[0].min, intervals[1].max, intervals[2].min);
+  corners[3] = vec3(intervals[0].max, intervals[1].min, intervals[2].min);
+  corners[4] = vec3(intervals[0].max, intervals[1].max, intervals[2].min);
+  corners[5] = vec3(intervals[0].min, intervals[1].max, intervals[2].max);
+  corners[6] = vec3(intervals[0].max, intervals[1].min, intervals[2].max);
+  corners[7] = vec3(intervals[0].max, intervals[1].max, intervals[2].max);
+  return corners;
+}

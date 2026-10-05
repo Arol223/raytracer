@@ -2,8 +2,10 @@
 #include "aabb.hpp"
 #include "interval.hpp"
 #include "ray.hpp"
+#include "rtweekend.hpp"
 #include "vec3.hpp"
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -104,6 +106,75 @@ private:
   }
 };
 
+class planar_shape : public hittable {
+public:
+  enum class kind { quad, triangle, ellipse };
+
+  planar_shape(const point3 &Q, const vec3 &u, const vec3 &v,
+               const std::shared_ptr<material> mat, kind shape = kind::quad)
+      : corner(Q), u_edge(u), v_edge(v), mat(mat), shape(shape) {
+    vec3 n = cross(u, v);
+    double part = dot(n, n);
+    assert(part > 0);
+    surface_normal = n / std::sqrt(part);
+    w = n / part;
+    D = dot(corner, surface_normal);
+    bbox = aabb(aabb(corner, corner + u + v), aabb(corner + u, corner + v));
+  }
+
+  bool hit(const ray &r, const interval &ray_t,
+           hit_record &rec) const override {
+    double nd = dot(surface_normal, r.d());
+    if (std::abs(nd) < 1e-8) {
+      return false;
+    }
+    double t = (D - dot(surface_normal, r.o())) / nd;
+    if (!ray_t.contains(t)) {
+      return false;
+    }
+    point3 P = r.at(t);
+    point3 p = P - corner;
+    double alpha = dot(w, cross(p, v_edge));
+    double beta = dot(w, cross(u_edge, p));
+    if (is_interior(alpha, beta)) {
+      rec.u = alpha;
+      rec.v = beta;
+      rec.t = t;
+      rec.p = P;
+      rec.mat = mat;
+      rec.set_face_normal(r, surface_normal);
+      return true;
+    }
+    return false;
+  }
+
+  aabb bounding_box() const override { return bbox; }
+
+private:
+  point3 corner;
+  vec3 u_edge;
+  vec3 v_edge;
+  std::shared_ptr<material> mat;
+  kind shape;
+  vec3 surface_normal;
+  double D;
+  aabb bbox; // bounding box
+  vec3 w;
+
+  bool is_interior(double alpha, double beta) const {
+    switch (shape) {
+    case kind::quad:
+      return (interval(0, 1).contains(alpha) && interval(0, 1).contains(beta));
+    case kind::triangle:
+      return (alpha >= 0 && beta >= 0 && alpha + beta <= 1);
+    case kind::ellipse:
+      return ((alpha - 0.5) * (alpha - 0.5) + (beta - 0.5) * (beta - 0.5) <=
+              0.25);
+    }
+    return false;
+  }
+};
+
 class hittable_list : public hittable {
 public:
   hittable_list() = default;
@@ -190,4 +261,106 @@ private:
   std::shared_ptr<hittable> left, right;
 
   aabb bbox;
+};
+
+inline std::shared_ptr<hittable_list> box(const point3 &a, const point3 &b,
+                                          std::shared_ptr<material> mat) {
+  point3 min(0, 0, 0);
+  point3 max(0, 0, 0);
+
+  for (int i = 0; i < 3; i++) {
+    min[i] = std::min(a[i], b[i]);
+    max[i] = std::max(a[i], b[i]);
+  }
+
+  vec3 dx = vec3(max.x() - min.x(), 0, 0);
+  vec3 dy = vec3(0, max.y() - min.y(), 0);
+  vec3 dz = vec3(0, 0, max.z() - min.z());
+
+  auto sides = std::make_shared<hittable_list>();
+  auto add = [&](const point3 &corner, const vec3 &u, const vec3 &v) {
+    sides->add(std::make_shared<planar_shape>(corner, u, v, mat));
+  };
+  add(point3(min.x(), min.y(), max.z()), dx, dy);  // front (+z)
+  add(point3(max.x(), min.y(), max.z()), -dz, dy); // right (+x)
+  add(point3(max.x(), min.y(), min.z()), -dx, dy); // back (-z)
+  add(point3(min.x(), min.y(), min.z()), dz, dy);  // left(-x)
+  add(point3(min.x(), max.y(), max.z()), dx, -dz); // top(+y)
+  add(point3(min.x(), min.y(), min.z()), dx, dz);  // bottom (-y)
+  return sides;
+}
+
+class translate : public hittable {
+public:
+  translate(std::shared_ptr<hittable> obj, const vec3 &offs)
+      : object(std::move(obj)), offset(offs),
+        bbox(object->bounding_box() + offset) {}
+
+  bool hit(const ray &r, const interval &ray_t,
+           hit_record &rec) const override {
+    ray offset_ray = ray(r.o() - offset, r.d(), r.time());
+
+    if (object->hit(offset_ray, ray_t, rec)) {
+      rec.p += offset;
+      return true;
+    }
+    return false;
+  }
+
+  aabb bounding_box() const override { return bbox; }
+
+private:
+  std::shared_ptr<hittable> object;
+  vec3 offset;
+  aabb bbox;
+};
+
+class rotate : public hittable {
+public:
+  rotate(std::shared_ptr<hittable> obj, double theta)
+      : object(std::move(obj)), sin_theta(std::sin(deg_to_rad(theta))),
+        cos_theta(std::cos(deg_to_rad(theta))) {
+
+    // Constructing rotated bounding box
+    std::array<interval, 3> intervals;
+    std::array<vec3, 8> corners = get_corners(object->bounding_box());
+    for (int i = 0; i < 3; i++) {
+      double min_axis = +infinity, max_axis = -infinity;
+      for (vec3 corner : corners) {
+        vec3 rotated = rot(corner);
+        min_axis = std::min(min_axis, rotated[i]);
+        max_axis = std::max(max_axis, rotated[i]);
+      }
+      intervals[i] = interval(min_axis, max_axis);
+    }
+    bbox = aabb(intervals[0], intervals[1], intervals[2]);
+  }
+
+  aabb bounding_box() const override { return bbox; }
+
+  bool hit(const ray &r, const interval &ray_t,
+           hit_record &rec) const override {
+    ray rot_ray = ray(inv_rot(r.o()), inv_rot(r.d()), r.time());
+    if (object->hit(rot_ray, ray_t, rec)) {
+      rec.p = rot(rec.p);
+      rec.normal = rot(rec.normal);
+      return true;
+    }
+    return false;
+  }
+
+private:
+  std::shared_ptr<hittable> object;
+  double sin_theta;
+  double cos_theta;
+  aabb bbox;
+
+  vec3 rot(const vec3 &u) const {
+    return vec3(u.x() * cos_theta + u.z() * sin_theta, u.y(),
+                -sin_theta * u.x() + cos_theta * u.z());
+  }
+  vec3 inv_rot(const vec3 &u) const {
+    return vec3(cos_theta * u.x() - sin_theta * u.z(), u.y(),
+                sin_theta * u.x() + cos_theta * u.z());
+  }
 };

@@ -22,6 +22,7 @@ struct camera_settings {
   point3 look_from = point3(0, 0, 0);
   point3 look_at = point3(0, 0, -1);
   vec3 v_up = vec3(0, 1, 0);
+  color background_color = color(0.7, 0.8, 1.0);
   int seed = 1337;
   int samples_per_pixel = 100;
   int max_depth = 10;
@@ -39,7 +40,7 @@ public:
     seed = cs.seed;
     assert(cs.samples_per_pixel > 0);
     samples_per_pixel = cs.samples_per_pixel;
-
+    background_color = cs.background_color;
     assert(cs.max_depth > 0);
     max_depth = cs.max_depth;
 
@@ -123,6 +124,7 @@ private:
   int image_width;
   int image_height;
   int seed;
+  color background_color;
   int samples_per_pixel;
   double partition;
   int max_depth;
@@ -149,17 +151,15 @@ private:
 
       color attenuation = color();
       ray scattered = r;
+      color emitted = rec.mat->emitted(rec.u, rec.v, rec.p);
 
       if (rec.mat->scatter(r, rec, attenuation, scattered, rng)) {
-        return attenuation * ray_color(scattered, world, depth - 1, rng);
+        return emitted +
+               attenuation * ray_color(scattered, world, depth - 1, rng);
       }
-      return color(0, 0, 0);
+      return emitted;
     }
-    color white = color(1.0, 1.0, 1.0);
-
-    double a = 0.5 * (r.d()[1] + 1);
-
-    return (1 - a) * white + a * color(0.5, 0.7, 1.0);
+    return background_color;
   }
 
   ray get_ray(int i, int j, std::mt19937 &rng) const {
