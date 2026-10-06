@@ -353,7 +353,7 @@ void cornell_smoke() {
   auto red = std::make_shared<lambertian>(color(.65, .05, .05));
   auto white = std::make_shared<lambertian>(color(.73, .73, .73));
   auto green = std::make_shared<lambertian>(color(.12, .45, .15));
-  auto light = std::make_shared<diffuse_light>(color(15, 15, 15));
+  auto light = std::make_shared<diffuse_light>(color(7, 7, 7));
 
   auto wall = [&world](const point3 &q, const vec3 &u, const vec3 &v,
                        std::shared_ptr<material> mat) {
@@ -362,7 +362,7 @@ void cornell_smoke() {
 
   wall(point3(555, 0, 0), vec3(0, 555, 0), vec3(0, 0, 555), green);
   wall(point3(0, 0, 0), vec3(0, 555, 0), vec3(0, 0, 555), red);
-  wall(point3(343, 554, 332), vec3(-130, 0, 0), vec3(0, 0, -105), light);
+  wall(point3(113, 554, 127), vec3(330, 0, 0), vec3(0, 0, 305), light);
   wall(point3(0, 0, 0), vec3(555, 0, 0), vec3(0, 0, 555), white);
   wall(point3(555, 555, 555), vec3(-555, 0, 0), vec3(0, 0, -555), white);
   wall(point3(0, 0, 555), vec3(555, 0, 0), vec3(0, 555, 0), white);
@@ -387,6 +387,100 @@ void cornell_smoke() {
   settings.background_color = color(0, 0, 0);
   settings.samples_per_pixel = 1000;
   settings.max_depth = 50;
+
+  camera cam(settings);
+  cam.render(std::cout, world);
+}
+
+void book_2_final() {
+  std::mt19937 rng(42);
+  auto rnd = [&rng](double lo = 0.0, double hi = 1.0) {
+    return std::uniform_real_distribution<double>(lo, hi)(rng);
+  };
+
+  // Floor: 20 x 20 boxes of random height, in their own BVH
+  hittable_list floor_boxes;
+  auto ground = std::make_shared<lambertian>(color(0.48, 0.83, 0.53));
+
+  const int boxes_per_side = 20;
+  const double w = 100.0;
+  for (int i = 0; i < boxes_per_side; i++) {
+    for (int j = 0; j < boxes_per_side; j++) {
+      double x0 = -1000.0 + i * w;
+      double z0 = -1000.0 + j * w;
+      double y1 = rnd(1, 101);
+      floor_boxes.add(
+          box(point3(x0, 0, z0), point3(x0 + w, y1, z0 + w), ground));
+    }
+  }
+
+  hittable_list world;
+  world.add(std::make_shared<bvh_node>(floor_boxes.get_hit_list()));
+
+  // Light
+  auto light = std::make_shared<diffuse_light>(color(7, 7, 7));
+  world.add(std::make_shared<planar_shape>(
+      point3(123, 554, 147), vec3(300, 0, 0), vec3(0, 0, 265), light));
+
+  // Moving sphere
+  point3 center1(400, 400, 200);
+  point3 center2 = center1 + vec3(30, 0, 0);
+  world.add(std::make_shared<sphere>(
+      center1, center2, 50,
+      std::make_shared<lambertian>(color(0.7, 0.3, 0.1))));
+
+  // Glass and metal spheres
+  world.add(std::make_shared<sphere>(point3(260, 150, 45), 50,
+                                     std::make_shared<dielectric>(1.5)));
+  world.add(std::make_shared<sphere>(
+      point3(0, 150, 145), 50,
+      std::make_shared<metal>(color(0.8, 0.8, 0.9), 1.0)));
+
+  // Glass sphere filled with blue fog
+  auto fog_ball = std::make_shared<sphere>(point3(360, 150, 145), 70,
+                                           std::make_shared<dielectric>(1.5));
+  world.add(fog_ball);
+  world.add(
+      std::make_shared<constant_medium>(fog_ball, 0.2, color(0.2, 0.4, 0.9)));
+
+  // Thin mist over the whole scene
+  auto mist_boundary = std::make_shared<sphere>(
+      point3(0, 0, 0), 5000, std::make_shared<dielectric>(1.5));
+  world.add(
+      std::make_shared<constant_medium>(mist_boundary, 0.0001, color(1, 1, 1)));
+
+  // Earth
+  auto earth_tex = std::make_shared<image_texture>("earthmap.jpg");
+  world.add(std::make_shared<sphere>(point3(400, 200, 400), 100,
+                                     std::make_shared<lambertian>(earth_tex)));
+
+  // Marble
+  auto marble = std::make_shared<noise_texture>(0.2, rng);
+  world.add(std::make_shared<sphere>(point3(220, 280, 300), 80,
+                                     std::make_shared<lambertian>(marble)));
+
+  // Cube of 1000 small white spheres, in its own BVH, rotated and moved
+  hittable_list cluster;
+  auto white = std::make_shared<lambertian>(color(.73, .73, .73));
+  for (int n = 0; n < 1000; n++) {
+    cluster.add(std::make_shared<sphere>(
+        point3(rnd(0, 165), rnd(0, 165), rnd(0, 165)), 10, white));
+  }
+  world.add(std::make_shared<translate>(
+      std::make_shared<rotate>(
+          std::make_shared<bvh_node>(cluster.get_hit_list()), 15),
+      vec3(-100, 270, 395)));
+
+  camera_settings settings;
+  settings.image_width = 800;
+  settings.aspect_ratio = 1.0;
+  settings.vfov = 40;
+  settings.look_from = point3(478, 278, -600);
+  settings.look_at = point3(278, 278, 0);
+  settings.v_up = vec3(0, 1, 0);
+  settings.background_color = color(0, 0, 0);
+  settings.samples_per_pixel = 10000;
+  settings.max_depth = 40;
 
   camera cam(settings);
   cam.render(std::cout, world);

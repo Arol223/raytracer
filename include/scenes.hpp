@@ -18,3 +18,5 @@ void cornell_box();
 void standard_cornell();
 
 void cornell_smoke();
+
+void book_2_final();
